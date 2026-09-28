@@ -5,9 +5,8 @@ ResNet-50 feature pyramid backbone, a horizontal region proposal network,
 supervised proposal correction, rotated position-sensitive alignment,
 geometry-guided regional interaction, and two-stage localization supervision.
 
-This repository provides **model source code, a portable running entrypoint,
-and documentation**. Trained GRIT-OBB weights, medical images, annotations,
-and experiment outputs are not distributed.
+Model code and training, evaluation, and prediction commands are provided.
+Trained weights and datasets are not included.
 
 ## Contents
 
@@ -16,10 +15,8 @@ and experiment outputs are not distributed.
 - `runtime/`: dataset reader, deterministic preprocessing, and evaluation code.
 - `run.py`: training, split evaluation, and single-image prediction.
 
-The model implementation is preserved from the research code. The public
-entrypoint is a simplified portable runner, not the original experiment
-orchestration system. It does not reproduce the complete multi-seed,
-ablation, or robustness study automatically.
+The runner supports individual training runs; multi-seed, ablation, and
+robustness experiments require separate configuration.
 
 ## Environment
 
@@ -33,24 +30,22 @@ python -m pip install numpy==2.1.2 Pillow==11.0.0 opencv-python
 python run.py --help
 ```
 
-The backbone, FPN and horizontal RPN use torchvision. Custom rotated geometry,
-sampling and post-processing are implemented in the model package. No MMDetection
-or MMRotate installation is required by this release.
+The backbone, FPN, and RPN use torchvision. The detection architecture builds on
+RoI Transformer; the relation geometry is adapted from OrientedFormer.
 
 ## Data format
 
-Prepare your own appropriately authorized data. `--data-root` is the parent of
-the dataset directory. Dataset keys map to directories as follows:
+`--data-root` is the parent of the dataset directory:
 
 | Key | Directory | Dataset |
 | --- | --- | --- |
-| `d02` | `D02_OBB` | FOCUS detection annotations |
+| `focus` | `FOCUS_OBB` | FOCUS detection annotations |
 | `ocd` | `OCD_OBB` | OCD |
 | `au_opg` | `AU_OPG_OBB` | AU-OPG |
 
 ```text
 data/
-  D02_OBB/
+  FOCUS_OBB/
     images/train/...
     images/val/...
     images/test/...
@@ -59,8 +54,7 @@ data/
     annotations/instances_test_obb.json
 ```
 
-Each JSON file has `images`, `annotations`, and `categories` arrays. A minimal
-schema example (illustrative only) is:
+Each split uses the following JSON format:
 
 ```json
 {
@@ -85,32 +79,26 @@ augmentation is applied.
 ## Train
 
 ```bash
-python run.py train --dataset d02 --data-root ./data --output ./runs/focus_seed0 --device cuda --seed 0 --epochs 50
+python run.py train --dataset focus --data-root ./data --output ./runs/focus_seed0 --device cuda --seed 0 --epochs 50
 ```
 
-The runner uses batch size 1, AdamW (learning rate 0.0001, weight decay 0.0001),
-gradient clipping at 1, and a cosine learning-rate schedule with a 50-epoch
-horizon. It saves `best.pt` according to validation AP50 and `last.pt` after each
-epoch. It does not use the test split for checkpoint selection. Use an empty
-output directory for each run. This simplified runner has no resume or early
-stopping support; 50 epochs is its default run length.
+Training uses batch size 1, AdamW (learning rate 0.0001, weight decay 0.0001),
+gradient clipping at 1, and a 50-epoch cosine schedule. `best.pt` is selected by
+validation AP50; `last.pt` is saved each epoch. Use an empty output directory.
+Resume and early stopping are not supported.
 
-By default, torchvision downloads ImageNet backbone initialization if it is
-not cached. These are generic backbone weights, not trained GRIT-OBB weights.
-Use `--no-pretrained` to initialize without downloading backbone weights.
+ImageNet backbone weights are downloaded if not cached. Use `--no-pretrained`
+for random initialization.
 
 ## Evaluate
 
 ```bash
-python run.py evaluate --dataset d02 --data-root ./data --checkpoint ./runs/focus_seed0/best.pt --split test --output ./results/test.json --device cuda
+python run.py evaluate --dataset focus --data-root ./data --checkpoint ./runs/focus_seed0/best.pt --split test --output ./results/test.json --device cuda
 ```
 
-The entrypoint reports rotated AP50 and exports ground truth and predictions
-in original image coordinates. AP50 is returned on the evaluator's native
-0-to-1 scale. It is not the complete manuscript metric table. Additional
-metric functions are available in `runtime/frozen_metric.py` and
-`runtime/evaluation.py`; operating thresholds must be selected using validation
-data only.
+Evaluation exports rotated AP50 (0--1), ground truth, and predictions in original
+image coordinates. Additional metrics are available in `runtime/frozen_metric.py`
+and `runtime/evaluation.py`. Select operating thresholds on validation data.
 
 ## Predict
 
@@ -118,12 +106,8 @@ data only.
 python run.py predict --checkpoint ./runs/focus_seed0/best.pt --image ./example.png --output ./results/prediction.json --device cuda --score-threshold 0.5
 ```
 
-Prediction requires a checkpoint produced by this runner. Output includes
-zero-based class IDs, class names, scores and four-vertex bounding polygons in
-original image coordinates. The example threshold is for displaying predictions;
-it is not a validated clinical operating threshold. No trained checkpoint is
-included in this repository.
+Use a checkpoint produced by this runner. Output contains class IDs, names,
+scores, and four-vertex bounding polygons in original image coordinates.
+The display threshold defaults to 0.5.
 
-The native exact polygon-based rotated NMS can be slow when many candidates
-survive score filtering. Parameter count or FLOPs alone should not be interpreted
-as end-to-end inference speed. This is research code for oriented localization.
+Exact polygon-based rotated NMS may be slow with large candidate sets.

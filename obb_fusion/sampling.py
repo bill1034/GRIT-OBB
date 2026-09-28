@@ -1,9 +1,3 @@
-"""Rotated position-sensitive alignment, defined identically on CPU and CUDA.
-
-Selected-channel bilinear interpolation avoids materializing K^2 unnecessary
-feature-channel copies per bin. Integer neighbor choice is not differentiable;
-interpolation weights and feature values are differentiable almost everywhere.
-"""
 from __future__ import annotations
 from typing import Sequence
 import torch
@@ -13,7 +7,7 @@ from .geometry import _precision
 
 def sample_points(boxes: Tensor, output_size: int = 7, sampling_ratio: int = 2,
                   context: Sequence[float] = (1.,1.)) -> Tensor:
-    """Return [N,K^2,S^2,2] image-pixel points, bin-major then sub-bin-major."""
+
     if output_size<1 or sampling_ratio<1 or len(context)!=2 or min(context)<=0:
         raise ValueError("Positive grid sizes and two positive context scales are required")
     b=_precision(boxes)
@@ -35,12 +29,8 @@ def sample_points(boxes: Tensor, output_size: int = 7, sampling_ratio: int = 2,
 def rps_pool_single(feature: Tensor, boxes: Tensor, stride: int,
                     output_size: int=7, channels: int=10,
                     sampling_ratio: int=2, context: Sequence[float]=(1.,1.)) -> Tensor:
-    """Pool [K^2*C,H,W] into [N,C,K,K] using true position-sensitive bins.
 
-    Feature-center convention: image location (x,y) maps to feature index
-    (x/stride-.5,y/stride-.5). Outside feature support is zero padded, exactly
-    matching grid_sample(..., align_corners=False, padding_mode='zeros').
-    """
+
     k=output_size
     if feature.ndim!=3 or feature.shape[0]!=k*k*channels:
         raise ValueError("Thin feature must have K*K*channels channels")
@@ -86,8 +76,8 @@ class MultiScaleRPSAlign(nn.Module):
         output=_precision(features[0]).new_zeros((len(boxes),self.channels,self.output_size,self.output_size))
         if not len(boxes):
             return output
-        # The scale selector is discrete; box gradients exist only within a
-        # selected level, as for conventional FPN RoI assignment.
+
+
         with torch.no_grad():
             size=(boxes[:,2]*boxes[:,3]).clamp_min(1e-12).sqrt()
             levels=(4+torch.log2(size/224+1e-12)).floor().clamp(2,5).long()-2

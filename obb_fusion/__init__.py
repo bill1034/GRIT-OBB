@@ -1,4 +1,3 @@
-"""Independent geometry-aware RoI Transformer research package."""
 from .config import ModelConfig
 from .model import GeometryRelationRoITransformer, build_model
 from .checkpoint import save_checkpoint, load_checkpoint

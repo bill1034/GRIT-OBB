@@ -1,4 +1,3 @@
-"""Class-aware exact rotated NMS. The detector is explicitly NOT NMS-free."""
 from __future__ import annotations
 import torch
 from torch import Tensor
@@ -21,8 +20,8 @@ def rotated_nms(boxes: Tensor, scores: Tensor, iou_threshold: float=.5) -> Tenso
         rest=order[1:]
         if not len(rest):
             break
-        # Only a conservative disjointness shortcut. A positive HBB overlap is
-        # NEVER used as rotated IoU. Every possible suppression uses polygon IoU.
+
+
         left=torch.maximum(envelopes[current,:2],envelopes[rest,:2])
         right=torch.minimum(envelopes[current,2:],envelopes[rest,2:])
         candidates=(right>left).all(-1)
@@ -43,8 +42,8 @@ def class_aware_rotated_nms(boxes: Tensor, scores: Tensor, labels: Tensor,
     if max_detections is not None:
         if not len(boxes):
             return torch.empty(0,dtype=torch.long,device=boxes.device)
-        # Reproduce full per-class NMS ordering: descending score globally;
-        # ties use ascending class, then original candidate order within class.
+
+
         order=torch.arange(len(scores),device=scores.device)
         order=order[labels[order].argsort(stable=True)]
         order=order[scores[order].argsort(descending=True,stable=True)]
@@ -86,7 +85,7 @@ def postprocess(boxes: Tensor, probabilities: Tensor, score_threshold: float=.05
                 pre_nms_topk: int=5000) -> dict[str,Tensor]:
     if not torch.isfinite(boxes).all() or not torch.isfinite(probabilities).all():
         raise FloatingPointError("Nonfinite detector output; refusing to hide it with filtering")
-    # Background is index 0 internally; public labels are zero-based foreground.
+
     proposal,category=torch.where(probabilities[:,1:]>score_threshold)
     scores=probabilities[proposal,category+1]
     if len(scores)>pre_nms_topk:

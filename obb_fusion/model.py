@@ -1,9 +1,3 @@
-"""RoI Transformer based OBB detector with two independently switchable additions.
-
-The implementation is intentionally independent of legacy MMRotate/MXNet. It
-retains supervised horizontal-to-rotated geometry and RPS alignment, not an
-entire second detector. It is not weight-compatible with the official models.
-"""
 from __future__ import annotations
 from collections import OrderedDict
 from typing import Sequence
@@ -27,7 +21,7 @@ from .postprocess import postprocess
 @torch.no_grad()
 def match_labels(proposals: Tensor, gt_boxes: Tensor, gt_labels: Tensor,
                  positive_iou: float, rotated: bool) -> tuple[Tensor,Tensor]:
-    """One-to-many IoU assignment. Background=0; foreground=public label+1."""
+
     if len(gt_boxes)==0:
         return (torch.zeros(len(proposals),device=proposals.device,dtype=torch.long),
                 torch.zeros(len(proposals),device=proposals.device,dtype=torch.long))
@@ -55,15 +49,15 @@ class GeometryRelationRoITransformer(nn.Module):
         self.config=ModelConfig.from_value(config)
         cfg=self.config
         weight_enum=None if cfg.weights is None else ResNet50_Weights[cfg.weights]
-        # A requested download failure propagates. There is no hidden random
-        # fallback. FrozenBN is also used when weights=None for CPU validation.
+
+
         self.backbone=resnet_fpn_backbone(backbone_name='resnet50',weights=weight_enum,
             norm_layer=FrozenBatchNorm2d,trainable_layers=cfg.trainable_backbone_layers)
         self.pretrained_status={'requested':cfg.weights,'loaded':weight_enum is not None,
             'source':None if weight_enum is None else weight_enum.url,
             'scope':'ResNet-50 only; FPN and detection heads are newly initialized'}
-        # Standard horizontal RPN. Two scales retain standard sizes and add a
-        # 16-pixel P2 anchor; all four ablations use exactly the same anchors.
+
+
         anchors=AnchorGenerator(sizes=((16,32),(32,64),(64,128),(128,256),(256,512)),
             aspect_ratios=((.5,1.,2.),)*5)
         self.rpn=RegionProposalNetwork(anchors,RPNHead(256,6),fg_iou_thresh=.7,
@@ -86,13 +80,13 @@ class GeometryRelationRoITransformer(nn.Module):
         nn.init.normal_(self.regressor.weight,std=.001); nn.init.zeros_(self.regressor.bias)
         self.register_buffer('image_mean',torch.tensor([.485,.456,.406])[:,None,None])
         self.register_buffer('image_std',torch.tensor([.229,.224,.225])[:,None,None])
-        # Construct AFTER all common initialization: equal seeds produce exactly
-        # equal common parameters across physical base/full configurations.
+
+
         self.relation=(GaussianRelationResidual(cfg.head_dim,cfg.relation_dim,
             cfg.relation_heads,cfg.relation_gate_init) if cfg.use_relation else None)
 
     def set_ablation(self, relation: bool, iou: bool) -> None:
-        """A full model can switch either addition off without replacing weights."""
+
         if relation and self.relation is None:
             raise ValueError('This base instance has no relation module; build a full instance to enable it')
         self.config.use_relation=bool(relation)
@@ -151,8 +145,8 @@ class GeometryRelationRoITransformer(nn.Module):
         image_list=self._prepare_images(images)
         gt=None if targets is None else self._targets(targets,image_list)
         features=self.backbone(image_list.tensors)
-        # RPN box coding and torchvision NMS stay float32 under AMP. This uses
-        # the same RPN, not a behavioral fallback for a missing low-precision op.
+
+
         with torch.autocast(device_type=image_list.tensors.device.type,enabled=False):
             float_features=OrderedDict((k,v.float()) for k,v in features.items())
             rpn_gt=None if gt is None else [{'boxes':rbox_to_hbb(t['boxes'])} for t in gt]
@@ -186,8 +180,8 @@ class GeometryRelationRoITransformer(nn.Module):
                 stage_losses.setdefault('loss_learner_code',[]).append(code1)
                 if cfg.use_iou_loss:
                     stage_losses.setdefault('loss_learner_iou',[]).append(cfg.iou_weight*iou1)
-            # Stage boundary: no geometry gradient through reference refinement
-            # or assignment into the learner. The learner has direct supervision.
+
+
             references=learned.detach()
             if target is not None:
                 references=torch.cat((references,target['boxes']),0)

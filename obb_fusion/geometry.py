@@ -1,11 +1,3 @@
-"""Continuous-pixel oriented geometry with a single convention.
-
-rbox = (cx, cy, width, height, theta), theta in radians. Positive rotation is
-clockwise on an image whose y axis points down. Corners follow that rotation.
-All area calculations below are true rectangle polygon intersections. There is
-no horizontal/probabilistic substitute. Geometry is piecewise differentiable;
-inside tests, intersection topology and sorting have discrete boundaries.
-"""
 from __future__ import annotations
 import math
 from typing import Sequence
@@ -19,12 +11,12 @@ def _precision(x: Tensor) -> Tensor:
 
 
 def wrap_angle(theta: Tensor, period: float = math.pi) -> Tensor:
-    """Map to [-period/2, period/2); derivative is one away from the seam."""
+
     return torch.remainder(theta + period / 2, period) - period / 2
 
 
 def canonicalize(boxes: Tensor) -> Tensor:
-    """Long side is w; theta is le90. No forced angle for near-square boxes."""
+
     if boxes.shape[-1] != 5:
         raise ValueError("rboxes must end in five coordinates")
     b = _precision(boxes)
@@ -55,12 +47,8 @@ def rbox_to_corners(boxes: Tensor) -> Tensor:
 
 
 def rectangle_to_rbox(polygons: Tensor, tolerance: float = 1e-5) -> Tensor:
-    """Exact inverse for rectangles with consecutive cyclic vertices.
 
-    A general quadrilateral is not an rbox. Reject it rather than silently
-    substitute a minimum-area enclosing rectangle and claim equivalence.
-    Clockwise/counterclockwise order and all four start vertices are accepted.
-    """
+
     if polygons.shape[-2:] != (4, 2):
         raise ValueError("Expected [...,4,2] rectangle vertices")
     p = _precision(polygons)
@@ -81,7 +69,7 @@ def rbox_to_hbb(boxes: Tensor) -> Tensor:
 
 
 def hbb_to_rbox(boxes: Tensor) -> Tensor:
-    """Uncanonicalized theta-zero references preserve the horizontal frame."""
+
     center = (boxes[..., :2] + boxes[..., 2:]) / 2
     wh = (boxes[..., 2:] - boxes[..., :2]).clamp_min(.01)
     return torch.cat((center, wh, torch.zeros_like(wh[..., :1])), -1)
@@ -96,7 +84,7 @@ def _inside(points: Tensor, box: Tensor, eps: float) -> Tensor:
     co, si = box[:, None, 4].cos(), box[:, None, 4].sin()
     local_x = co*d[...,0] + si*d[...,1]
     local_y = -si*d[...,0] + co*d[...,1]
-    # Relative, not image-origin dependent, inclusion tolerance.
+
     return (local_x.abs() <= box[:,None,2]/2 + eps*box[:,None,2]) & (local_y.abs() <= box[:,None,3]/2 + eps*box[:,None,3])
 
 
@@ -107,8 +95,8 @@ def _aligned_iou_core(a: Tensor, b: Tensor) -> Tensor:
     if a.numel() == 0:
         return a[..., 0] * 0
     aa, bb = a.reshape(-1,5), b.reshape(-1,5)
-    # Translate before constructing corners; prevents cancellation for thin
-    # rectangles far from the image origin. Translation is fully differentiable.
+
+
     origin = aa[:, :2]
     aa = torch.cat((aa[:, :2]-origin, aa[:, 2:]), -1)
     bb = torch.cat((bb[:, :2]-origin, bb[:, 2:]), -1)
@@ -132,8 +120,8 @@ def _aligned_iou_core(a: Tensor, b: Tensor) -> Tensor:
     count = valid.sum(1)
     centroid = vertices.sum(1)/count.clamp_min(1)[:,None]
     centered = vertices-centroid[:,None]
-    # atan2(0,0) has undefined backward. Ordering has no derivative and is
-    # computed under no_grad; gradients flow through gathered coordinates.
+
+
     with torch.no_grad():
         angles = torch.atan2(centered[...,1],centered[...,0])
         angles = torch.where(valid,angles,torch.full_like(angles,4*math.pi))
@@ -145,14 +133,14 @@ def _aligned_iou_core(a: Tensor, b: Tensor) -> Tensor:
     area = (_cross(v,vnext)*(idx<count[:,None])).sum(1).abs()/2
     area = torch.where(count>=3,area,torch.zeros_like(area))
     area_a, area_b = aa[:,2]*aa[:,3], bb[:,2]*bb[:,3]
-    # Numerical guard only: the mathematical intersection cannot exceed either.
+
     area = torch.minimum(area,torch.minimum(area_a,area_b)).clamp_min(0)
     union = (area_a+area_b-area).clamp_min(1e-12)
     return (area/union).clamp(0,1).reshape(shape)
 
 
 def aligned_rotated_iou(a: Tensor, b: Tensor) -> Tensor:
-    """Exact polygon IoU; fp16/bfloat16 inputs are promoted, not approximated."""
+
     with torch.autocast(device_type=a.device.type,enabled=False):
         dtype = torch.promote_types(_precision(a).dtype,_precision(b).dtype)
         return _aligned_iou_core(a.to(dtype),b.to(dtype))
@@ -187,14 +175,14 @@ def _code_variants(references: Tensor, targets: Tensor) -> Tensor:
 
 
 def encode_boxes(references: Tensor, targets: Tensor) -> Tensor:
-    """Local-frame coder chooses the equivalent target with smaller angle delta."""
+
     variants=_code_variants(references,targets)
     best=variants[...,-1].abs().argmin(-1)
     return variants.gather(-2,best[...,None,None].expand(*best.shape,1,5)).squeeze(-2)
 
 
 def decode_boxes(references: Tensor, deltas: Tensor) -> Tensor:
-    """Local rotation-aware update. Guards only extreme invalid size exponentials."""
+
     with torch.autocast(device_type=references.device.type,enabled=False):
         ref, delta = _precision(references),_precision(deltas)
         wh=ref[...,2:4].clamp_min(.01)
@@ -208,11 +196,8 @@ def decode_boxes(references: Tensor, deltas: Tensor) -> Tensor:
 
 
 def equivalent_code_loss(predicted_deltas: Tensor, references: Tensor, targets: Tensor, beta: float = 1/9) -> Tensor:
-    """Per-box sum SmoothL1, minimized over equivalent w/h-angle targets.
 
-    Angle residual itself is pi-periodic. No long-side boundary jump is imposed
-    as a loss target. The branch minimum is nondifferentiable only at a tie.
-    """
+
     p=_precision(predicted_deltas)
     targets2=_code_variants(references,targets)
     error=p[...,None,:]-targets2
@@ -231,11 +216,8 @@ def covariance(boxes: Tensor) -> Tensor:
 
 
 def gaussian_w2(a: Tensor, b: Tensor) -> Tensor:
-    """Pairwise Gaussian W2 distance [N,M], ONLY for relation attention.
 
-    Closed 2x2 Bures identity avoids eigendecomposition. This is not IoU and
-    deliberately is never used by assignment, NMS or the rotated IoU loss.
-    """
+
     with torch.autocast(device_type=a.device.type,enabled=False):
         a,b=_precision(a),_precision(b)
         A,B=covariance(a),covariance(b)
@@ -251,7 +233,7 @@ def gaussian_w2(a: Tensor, b: Tensor) -> Tensor:
 
 
 def transform_polygons(polygons: Tensor, scale: float | Sequence[float], pad: Sequence[float]=(0.,0.)) -> Tensor:
-    """Exact polygon transform even for anisotropic scaling; padding is (x,y)."""
+
     s=(float(scale),float(scale)) if isinstance(scale,(float,int)) else tuple(scale)
     if len(s)!=2 or min(s)<=0 or len(pad)!=2:
         raise ValueError("scale must be positive (sx,sy); pad must be (x,y)")
@@ -259,7 +241,7 @@ def transform_polygons(polygons: Tensor, scale: float | Sequence[float], pad: Se
 
 
 def transform_rboxes(boxes: Tensor, scale: float | Sequence[float], pad: Sequence[float]=(0.,0.)) -> Tensor:
-    """Exact similarity transform. Nonuniform scale must use polygons instead."""
+
     s=(float(scale),float(scale)) if isinstance(scale,(float,int)) else tuple(scale)
     if len(s)!=2 or min(s)<=0 or abs(s[0]-s[1])>1e-12:
         raise ValueError("Anisotropic resize does not preserve rotated rectangles; transform polygons instead")

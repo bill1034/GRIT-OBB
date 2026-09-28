@@ -1,4 +1,3 @@
-"""State-dict checkpoints; no whole-model pickle and no network on restore."""
 from __future__ import annotations
 from pathlib import Path
 import os
@@ -32,7 +31,7 @@ def load_checkpoint(path,model=None,optimizer=None,map_location='cpu',restore_rn
     model.load_state_dict(checkpoint['model'],strict=True)
     model.set_ablation(checkpoint['config']['use_relation'],checkpoint['config']['use_iou_loss'])
     model.config.weights=checkpoint['config']['weights']
-    # Restore original metadata, but never download ImageNet on checkpoint load.
+
     model.pretrained_status=dict(checkpoint['pretrained_status'])
     if optimizer is not None:
         if checkpoint['optimizer'] is None:

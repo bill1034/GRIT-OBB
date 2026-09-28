@@ -9,7 +9,7 @@ class ModelConfig:
     num_classes: int = 15
     weights: str | None = 'IMAGENET1K_V1'
     trainable_backbone_layers: int = 3
-    input_size: int = 1024  # Documentation/default profiling size; never silently resizes images.
+    input_size: int = 1024
     pool_size: int = 7
     ps_channels: int = 10
     sampling_ratio: int = 2

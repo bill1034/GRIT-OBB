@@ -1,11 +1,3 @@
-"""Read-only adapter for the frozen ``preprocessed_obb_v3`` medical OBB data.
-
-The adapter uses the authoritative per-split OBB JSON files. Preprocessing
-matches the frozen OrientedFormer formal pipeline: MMDetection keep-ratio
-resize with rounded integer dimensions, OpenCV bilinear interpolation, then
-zero padding on the right and bottom. Boxes use ``(cx, cy, long_side,
-short_side, theta)`` with theta in radians and ``[-pi/2, pi/2)``.
-"""
 from __future__ import annotations
 
 import json
@@ -21,7 +13,7 @@ from torch.utils.data import Dataset
 
 
 _DATASETS = {
-    "d02": "D02_OBB",
+    "focus": "FOCUS_OBB",
     "ocd": "OCD_OBB",
     "au_opg": "AU_OPG_OBB",
 }
@@ -38,7 +30,7 @@ def _canonicalize_longsidele90(box: np.ndarray) -> np.ndarray:
 
 
 def polygon_to_longsidele90(polygons: Tensor) -> Tensor:
-    """Convert N quadrilaterals to long-side-le90 rotated rectangles."""
+
     array = polygons.detach().cpu().numpy().astype(np.float32, copy=False)
     result = []
     for polygon in array.reshape(-1, 4, 2):
@@ -51,7 +43,7 @@ def polygon_to_longsidele90(polygons: Tensor) -> Tensor:
 
 
 def longsidele90_to_polygon(boxes: Tensor) -> Tensor:
-    """Convert long-side-le90 boxes to quadrilaterals."""
+
     device = boxes.device
     result = []
     for cx, cy, width, height, angle in boxes.detach().cpu().numpy():
@@ -64,7 +56,7 @@ def longsidele90_to_polygon(boxes: Tensor) -> Tensor:
 
 
 def rescale_rboxes_formal(boxes: Tensor, scale_factor: tuple[float, float]) -> Tensor:
-    """Match MMRotate ``RotatedBoxes.rescale_`` and le90 regularization."""
+
     if not len(boxes):
         return boxes.clone()
     scale_x, scale_y = scale_factor
@@ -86,10 +78,10 @@ def rescale_rboxes_formal(boxes: Tensor, scale_factor: tuple[float, float]) -> T
 
 
 def _formal_resize_and_pad(array: np.ndarray, polygons: Tensor, size: int):
-    """Match MMDetection Resize(keep_ratio=True)+Pad(size), without augments."""
+
     height, width = array.shape[:2]
     scale = min(size / width, size / height)
-    # mmcv rescale_size uses int(value * scale + 0.5).
+
     resized_width = min(size, int(width * scale + 0.5))
     resized_height = min(size, int(height * scale + 0.5))
     scale_x = resized_width / width
@@ -100,8 +92,7 @@ def _formal_resize_and_pad(array: np.ndarray, polygons: Tensor, size: int):
     canvas[:resized_height, :resized_width] = resized
     image = torch.from_numpy(canvas.astype(np.float32) / 255.0).permute(2, 0, 1)
 
-    # OrientedFormer converts qboxes to rboxes before Resize. Its RotatedBoxes
-    # rescale_ applies the realized x/y factors to centers, sides, and angle.
+
     boxes = rescale_rboxes_formal(
         polygon_to_longsidele90(polygons), (scale_x, scale_y))
     metadata = {
@@ -117,7 +108,7 @@ def _formal_resize_and_pad(array: np.ndarray, polygons: Tensor, size: int):
 
 
 class MedicalDataset(Dataset):
-    """Frozen real-data reader with no augmentation or model-side behavior."""
+
 
     def __init__(self, dataset_key: str, split: str, size: int = 1024, data_root=None):
         if dataset_key not in _DATASETS:

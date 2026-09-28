@@ -1,4 +1,3 @@
-"""Validation/test adapters around the frozen v3 rotated evaluator."""
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -26,7 +25,7 @@ _spec.loader.exec_module(frozen_metric)
 
 @contextmanager
 def preserve_rng_state():
-    """Make stochastic validation loss observational with respect to RNG."""
+
     py_state, np_state, cpu_state = random.getstate(), np.random.get_state(), torch.get_rng_state()
     cuda_state = torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None
     try:
@@ -66,7 +65,7 @@ def prediction_rows(prediction: dict, image_id, image_size: tuple[int, int],
 
 def evaluate(model, loader, device, class_names, *, compute_loss=True,
              heartbeat_path: Path | None=None, phase="validation", started=None):
-    """Return deterministic val loss, frozen rotated AP50 and auditable raw rows."""
+
     was_training = model.training
     losses, ground_truth, predictions, image_count = [], [], [], 0
     with preserve_rng_state(), torch.no_grad():
@@ -87,7 +86,7 @@ def evaluate(model, loader, device, class_names, *, compute_loss=True,
                     if not torch.isfinite(total):
                         raise FloatingPointError("non-finite validation loss")
                     losses.append(float(total.detach().cpu()))
-                # Target-free inference is a separate call; targets are never passed.
+
                 batch_predictions = model.predict(images)
                 for image, target, prediction in zip(images, targets, batch_predictions):
                     image_count += 1
@@ -109,7 +108,7 @@ def evaluate(model, loader, device, class_names, *, compute_loss=True,
 
 def full_metrics(rows: dict, class_names, operating_threshold: float,
                  small_area_threshold: float, medium_area_threshold: float):
-    """Offline full suite; caller must enforce best-checkpoint/test gates."""
+
     gt, pred = rows["ground_truth"], rows["predictions"]
     return frozen_metric.evaluate_detections(gt, pred, class_names,
         operating_threshold=operating_threshold, small_area_threshold=small_area_threshold,

@@ -1,8 +1,3 @@
-"""A single compact relation residual adapted from OrientedFormer geometry.
-
-This is NOT the official decoder. It adds no sparse cross-attention or FFN.
-The existing RoI-aligned feature remains the residual identity path.
-"""
 from __future__ import annotations
 import math
 import torch
@@ -12,7 +7,7 @@ from .geometry import covariance, gaussian_w2, _precision
 
 
 def gaussian_position_encoding(boxes: Tensor, dimension: int) -> Tensor:
-    """Expected sinusoidal features of Gaussian marginal x/y distributions."""
+
     if dimension%4:
         raise ValueError("Gaussian PE dimension must be divisible by four")
     b=_precision(boxes)
@@ -26,11 +21,8 @@ def gaussian_position_encoding(boxes: Tensor, dimension: int) -> Tensor:
 
 @torch.no_grad()
 def geometric_attention_bias(boxes: Tensor) -> Tensor:
-    """Official-style normalized W2 geometry; no gradient into reference boxes.
 
-    sqrt(sqrt(area_i*area_j)) equals the determinant-derived scale in the
-    inspected OrientedFormer get_gau_scores(normalize=True) implementation.
-    """
+
     b=_precision(boxes.detach())
     distance=gaussian_w2(b,b)
     distance=distance.masked_fill(torch.eye(len(b),device=b.device,dtype=torch.bool),0)
@@ -40,7 +32,7 @@ def geometric_attention_bias(boxes: Tensor) -> Tensor:
 
 
 class GaussianRelationResidual(nn.Module):
-    """RoI tokens [N,D] -> [N,D]; scalar tanh gate starts at +0.1, not zero."""
+
     def __init__(self, input_dim: int=1024, relation_dim: int=128, heads: int=4,
                  gate_init: float=.1) -> None:
         super().__init__()
@@ -66,7 +58,7 @@ class GaussianRelationResidual(nn.Module):
             b=_precision(boxes.detach())
             pe=gaussian_position_encoding(b,self.relation_dim)
             bias=geometric_attention_bias(b)
-        # Keep attention probabilities and geometry in float32 under AMP.
+
         with torch.autocast(device_type=tokens.device.type,enabled=False):
             q,k,v=_precision(q),_precision(k),_precision(v)
             pe=pe.to(q.dtype)

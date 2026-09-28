@@ -1,10 +1,3 @@
-"""Rotated validation and final-test metrics for the v3 OBB campaign.
-
-The validation path intentionally computes only rotated mAP50.  The complete
-metric suite is an offline/test-time operation after validation has selected a
-checkpoint and frozen the confidence threshold.
-"""
-
 from __future__ import annotations
 
 import json
@@ -18,15 +11,7 @@ import numpy as np
 
 
 def _is_vendored_gra_runtime() -> bool:
-    """Avoid importing the separate MMRotate package inside the GRA fork.
 
-    GRA vendors an MMDetection OBB registry.  In the legacy environment its
-    registry object is shared with the installed MMRotate 0.3 package, so
-    importing MMRotate after the official GRA detector has registered its
-    coders raises a duplicate-registration error.  The public evaluator does
-    not need MMRotate for this path: its OpenCV convex-polygon IoU fallback is
-    the same rotated geometry used by the other legacy runs.
-    """
 
     try:
         import mmdet
@@ -36,9 +21,9 @@ def _is_vendored_gra_runtime() -> bool:
         return False
 
 
-torch = None  # type: ignore[assignment]
+torch = None
 box_iou_rotated = None
-BaseMetric = object  # type: ignore[assignment,misc]
+BaseMetric = object
 METRICS = None
 QuadriBoxes = None
 RotatedBoxes = None
@@ -46,7 +31,7 @@ RotatedBoxes = None
 try:
     import torch
 except ImportError:
-    torch = None  # type: ignore[assignment]
+    torch = None
 
 try:
     from mmcv.ops import box_iou_rotated
@@ -56,16 +41,15 @@ except ImportError:
 try:
     from mmengine.evaluator import BaseMetric
 except ImportError:
-    BaseMetric = object  # type: ignore[assignment,misc]
+    BaseMetric = object
 
 if not _is_vendored_gra_runtime():
     try:
         from mmrotate.registry import METRICS
         from mmrotate.structures.bbox import QuadriBoxes, RotatedBoxes
     except Exception:
-        # Legacy MMRotate 0.3.x does not expose the MMEngine registry API, and
-        # some forked legacy trees share its registry with their own coders.
-        # The evaluator remains fully usable through its polygon IoU path.
+
+
         METRICS = None
         QuadriBoxes = None
         RotatedBoxes = None
@@ -119,7 +103,7 @@ def _row_iou(prediction: MetricRow, target: MetricRow) -> float:
 def _batched_iou_lookup(
     ground_truth: Sequence[MetricRow], predictions: Sequence[MetricRow]
 ) -> IoUFunction:
-    """Build one rotated-IoU matrix per class/image pair."""
+
     if torch is None or QuadriBoxes is None or box_iou_rotated is None:
         return _row_iou
     grouped_targets: dict[tuple[int, str], list[MetricRow]] = defaultdict(list)
@@ -226,7 +210,7 @@ def _match_predictions(
     score_threshold: float | None = None,
     max_dets_per_image: int | None = None,
 ) -> tuple[list[dict[str, Any]], dict[int, dict[str, int]], list[tuple[MetricRow, MetricRow, float]]]:
-    """Greedy class-aware matching shared by fixed, AR, FROC, and LRP."""
+
     gt_by_class_image: dict[tuple[int, str], list[MetricRow]] = defaultdict(list)
     for row in ground_truth:
         gt_by_class_image[(int(row["class_id"]), str(row["image_id"]))].append(row)
@@ -346,7 +330,7 @@ def select_operating_threshold(
     iou_fn: IoUFunction | None = None,
     match_iou_threshold: float = 0.5,
 ) -> float:
-    """Select one validation-only score threshold by macro F1, then recall."""
+
     if not predictions:
         return 1.0
     iou_fn = iou_fn or _row_iou
@@ -376,7 +360,7 @@ def compute_validation_map50(
     *,
     iou_fn: IoUFunction | None = None,
 ) -> float:
-    """Return only the validation checkpoint-selection metric."""
+
     iou_fn = iou_fn or _batched_iou_lookup(ground_truth, predictions)
     return _mean(
         _class_ap(ground_truth, predictions, class_id, 0.5, iou_fn)
@@ -572,7 +556,7 @@ def evaluate_detections(
     num_images: int | None = None,
     iou_fn: IoUFunction | None = None,
 ) -> dict[str, float]:
-    """Compute the complete Section 7 suite using qbox/rbox overlap."""
+
     num_classes = len(class_names)
     if medium_area_threshold is None:
         medium_area_threshold = float(small_area_threshold)
@@ -726,7 +710,7 @@ def evaluate_detections(
 def serialize_prediction_rows(
     path: Path, ground_truth: Sequence[MetricRow], predictions: Sequence[MetricRow]
 ) -> None:
-    """Write one JSON object per image so test inference is auditable/replayable."""
+
     by_image: dict[str, dict[str, list[MetricRow]]] = defaultdict(
         lambda: {"ground_truth": [], "predictions": []}
     )
@@ -764,8 +748,8 @@ def load_prediction_rows(path: Path) -> tuple[list[MetricRow], list[MetricRow]]:
     return ground_truth, predictions
 
 
-class MedicalOBBMetric(BaseMetric):  # type: ignore[misc]
-    """MMEngine metric wrapper with a deliberately small validation mode."""
+class MedicalOBBMetric(BaseMetric):
+
 
     default_prefix = None
 

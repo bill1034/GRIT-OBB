@@ -1,4 +1,3 @@
-"""Portable training, evaluation and image-prediction entrypoint for GRIT-OBB."""
 import argparse
 import json
 import random
@@ -126,14 +125,14 @@ def predict(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description="GRIT-OBB")
     sub = parser.add_subparsers(dest="command", required=True)
     for command in ("train", "evaluate", "predict"):
         p = sub.add_parser(command)
         p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
         p.add_argument("--output", type=Path, required=True)
         if command != "predict":
-            p.add_argument("--dataset", choices=("d02", "ocd", "au_opg"), required=True)
+            p.add_argument("--dataset", choices=("focus", "ocd", "au_opg"), required=True)
             p.add_argument("--data-root", type=Path, required=True)
         if command != "train":
             p.add_argument("--checkpoint", type=Path, required=True)
