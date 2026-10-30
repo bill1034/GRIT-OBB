@@ -43,7 +43,7 @@ The repository provides model code and training, evaluation, and prediction comm
 
 ## Framework
 
-![GRIT-OBB framework](grit-obb-framework.svg)
+![GRIT-OBB framework](grit-obb-framework.svg?v=paper-figure2)
 
 Figure 2 from the accepted manuscript. The central diagram shows the detection workflow, with modules (A)–(C) expanded in panels (a)–(c): (a) proposal correction and alignment; (b) geometry-guided relation residual; and (c) two-stage localization supervision, used only during training. Teal dashed arrows indicate detached geometry, while brown dashed arrows connect the corrected and final predictions to their supervision.
 
