@@ -43,19 +43,7 @@ The repository provides model code and training, evaluation, and prediction comm
 
 ## Framework
 
-```mermaid
-flowchart LR
-  A["Medical image"] --> B["ResNet-50 + FPN"]
-  B --> C["Horizontal RPN"]
-  C --> D["Supervised proposal correction"]
-  B --> E["Rotated position-sensitive alignment"]
-  D --> E
-  E --> F["Geometry-guided relation residual"]
-  D -. Box geometry .-> F
-  F --> G["Classification + oriented box refinement"]
-  D -.-> H["Proposal regression + rotated IoU loss"]
-  G -.-> I["Final regression + rotated IoU loss"]
-```
+![GRIT-OBB framework](grit-obb-framework.svg)
 
 Solid arrows show the feature/proposal flow; dashed arrows show geometric conditioning or training supervision. Corrected reference boxes are detached before feature sampling.
 
@@ -78,6 +66,7 @@ GRIT-OBB/
 ├── obb_fusion/              # Model, geometry, sampling, relation, and checkpoints
 ├── runtime/                 # Data adapter, preprocessing, and evaluation
 ├── run.py                   # Train / evaluate / predict entrypoint
+├── grit-obb-framework.svg    # Framework diagram
 ├── README.md                # English guide
 ├── README_zh-CN.md           # Chinese guide
 ├── CITATION.bib             # Accepted-paper BibTeX
