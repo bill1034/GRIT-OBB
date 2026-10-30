@@ -45,7 +45,7 @@ The repository provides model code and training, evaluation, and prediction comm
 
 ![GRIT-OBB framework](grit-obb-framework.svg)
 
-Solid arrows show the feature/proposal flow; dashed arrows show geometric conditioning or training supervision. Corrected reference boxes are detached before feature sampling.
+Figure 2 from the accepted manuscript. The central diagram shows the detection workflow, with modules (A)–(C) expanded in panels (a)–(c): (a) proposal correction and alignment; (b) geometry-guided relation residual; and (c) two-stage localization supervision, used only during training. Teal dashed arrows indicate detached geometry, while brown dashed arrows connect the corrected and final predictions to their supervision.
 
 ## Results
 
@@ -66,7 +66,7 @@ GRIT-OBB/
 ├── obb_fusion/              # Model, geometry, sampling, relation, and checkpoints
 ├── runtime/                 # Data adapter, preprocessing, and evaluation
 ├── run.py                   # Train / evaluate / predict entrypoint
-├── grit-obb-framework.svg    # Framework diagram
+├── grit-obb-framework.svg    # Figure 2 from the accepted manuscript
 ├── README.md                # English guide
 ├── README_zh-CN.md           # Chinese guide
 ├── CITATION.bib             # Accepted-paper BibTeX
